@@ -11,8 +11,11 @@
   <header class="topbar">
     <button id="toggleSidebar" class="icon-btn" title="Toggle panel" aria-label="Toggle panel">&#9776;</button>
     <h1>Sales Map</h1>
+    <span id="modeBadge" class="mode-badge"></span>
+    <span id="connectionStatus" class="conn-badge hidden"></span>
     <div class="topbar-actions">
       <span id="customerCount" class="count-badge">0 customers</span>
+      <button id="shareBtn" class="btn btn-sm btn-share hidden" title="Get the link to give your team">Share link</button>
       <button id="exportJsonBtn" class="btn btn-sm" title="Download all customers as a JSON backup">Export JSON</button>
       <button id="exportCsvBtn" class="btn btn-sm" title="Download all customers as a spreadsheet (CSV)">Export CSV</button>
       <label class="btn btn-sm" title="Import a JSON backup (merges with existing customers)">
@@ -122,11 +125,52 @@
     </main>
   </div>
 
+  <div id="localBanner" class="banner hidden">
+    <span id="localBannerText"></span>
+    <button id="uploadLocalBtn" class="btn btn-sm btn-primary">Upload to shared map</button>
+    <button id="dismissLocalBtn" class="btn btn-sm btn-ghost">Dismiss</button>
+  </div>
+
+  <div id="shareDialog" class="overlay hidden">
+    <div class="dialog">
+      <h2>Share this map</h2>
+      <p>Anyone who opens this link sees and edits the same customer list. Send it to your sales team and ask them to bookmark it.</p>
+      <div class="field-row">
+        <input type="text" id="shareLink" readonly />
+        <button id="copyLinkBtn" class="btn btn-primary">Copy</button>
+      </div>
+      <p class="hint">Keep the link private: it is the only thing protecting your data.</p>
+      <div class="field-row dialog-actions">
+        <button id="closeShareBtn" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="landing" class="overlay hidden">
+    <div class="dialog">
+      <h2>Sales Map</h2>
+      <p>Set up a shared customer map for your team, or open one you were invited to.</p>
+      <button id="createTeamBtn" class="btn btn-primary btn-block">Create a new shared map</button>
+      <div class="or-divider">or</div>
+      <form id="joinForm" class="form">
+        <label>
+          Paste the link you were given
+          <input type="text" id="joinLink" placeholder="https://.../?team=..." required />
+        </label>
+        <button type="submit" class="btn btn-block">Open shared map</button>
+      </form>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden"></div>
 
   <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/firebase/firebase-app-compat.js"></script>
+  <script src="vendor/firebase/firebase-database-compat.js"></script>
+  <script src="js/config.js"></script>
   <script src="js/statuses.js"></script>
   <script src="js/storage.js"></script>
+  <script src="js/store.js"></script>
   <script src="js/geo.js"></script>
   <script src="js/app.js"></script>
 </body>

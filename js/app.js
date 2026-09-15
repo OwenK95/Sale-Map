@@ -2,19 +2,12 @@
 (function () {
   'use strict';
 
-  // ---------- State ----------
-  let customers = Storage.load();
-  let searchResults = [];
-  let pickingLocation = false;
-  const customerMarkers = new Map(); // customer id -> Leaflet marker
-  const resultMarkers = new Map();   // osmId -> Leaflet marker
-  const MAP_VIEW_KEY = 'salesmap.view.v1';
-
   // ---------- DOM helpers ----------
   const $ = id => document.getElementById(id);
   const el = {
     sidebar: $('sidebar'), toggleSidebar: $('toggleSidebar'),
-    customerCount: $('customerCount'),
+    customerCount: $('customerCount'), connection: $('connectionStatus'),
+    shareBtn: $('shareBtn'), modeBadge: $('modeBadge'),
     customerList: $('customerList'), customerEmpty: $('customerEmpty'),
     filterText: $('customerFilterText'), filterStatus: $('customerFilterStatus'),
     legend: $('legend'),
@@ -31,6 +24,9 @@
     mapHint: $('mapHint'), cancelPickBtn: $('cancelPickBtn'),
     exportJsonBtn: $('exportJsonBtn'), exportCsvBtn: $('exportCsvBtn'), importFile: $('importFile'),
     toast: $('toast'),
+    landing: $('landing'), createTeamBtn: $('createTeamBtn'), joinForm: $('joinForm'), joinLink: $('joinLink'),
+    shareDialog: $('shareDialog'), shareLink: $('shareLink'), copyLinkBtn: $('copyLinkBtn'), closeShareBtn: $('closeShareBtn'),
+    localBanner: $('localBanner'), localBannerText: $('localBannerText'), uploadLocalBtn: $('uploadLocalBtn'), dismissLocalBtn: $('dismissLocalBtn'),
   };
 
   function escapeHtml(s) {
@@ -46,6 +42,85 @@
     toastTimer = setTimeout(() => el.toast.classList.add('hidden'), 3500);
   }
 
+  // ---------- Store selection (shared vs. browser-only) ----------
+  const config = window.SALES_MAP_CONFIG || {};
+  const sharedEnabled = !!(config.firebase && config.firebase.databaseURL);
+  let store = null;
+  let customers = [];
+
+  function teamKeyFromUrl() {
+    const key = new URLSearchParams(location.search).get('team');
+    return isValidTeamKey(key) ? key : null;
+  }
+
+  function teamUrl(key) {
+    const url = new URL(location.href);
+    url.search = '?team=' + key;
+    url.hash = '';
+    return url.toString();
+  }
+
+  function chooseStore() {
+    if (!sharedEnabled) {
+      el.modeBadge.textContent = 'This device only';
+      el.modeBadge.title = 'Customers are saved in this browser. See README to set up a shared team map.';
+      return new LocalStore();
+    }
+    let key = teamKeyFromUrl();
+    if (!key) {
+      let saved = null;
+      try { saved = localStorage.getItem(TEAM_KEY_STORAGE); } catch (_) {}
+      if (isValidTeamKey(saved)) { location.replace(teamUrl(saved)); return null; }
+      showLanding();
+      return null;
+    }
+    try { localStorage.setItem(TEAM_KEY_STORAGE, key); } catch (_) {}
+    el.modeBadge.textContent = 'Shared team map';
+    el.modeBadge.title = 'Everyone with the link sees and edits the same list.';
+    el.shareBtn.classList.remove('hidden');
+    try {
+      return new FirebaseStore(config.firebase, key);
+    } catch (err) {
+      console.error(err);
+      alert('Could not connect to the shared database: ' + err.message + '\n\nFalling back to this device only.');
+      el.modeBadge.textContent = 'This device only';
+      return new LocalStore();
+    }
+  }
+
+  function showLanding() {
+    el.landing.classList.remove('hidden');
+    el.createTeamBtn.addEventListener('click', () => {
+      location.href = teamUrl(generateTeamKey());
+    });
+    el.joinForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const text = el.joinLink.value.trim();
+      let key = null;
+      try { key = new URL(text).searchParams.get('team'); } catch (_) { key = text; }
+      if (!isValidTeamKey(key)) { alert('That does not look like a Sales Map link. Paste the full link you were given.'); return; }
+      location.href = teamUrl(key);
+    });
+  }
+
+  // ---------- Share dialog ----------
+  el.shareBtn.addEventListener('click', () => {
+    el.shareLink.value = location.href;
+    el.shareDialog.classList.remove('hidden');
+    el.shareLink.select();
+  });
+  el.closeShareBtn.addEventListener('click', () => el.shareDialog.classList.add('hidden'));
+  el.copyLinkBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(el.shareLink.value);
+      toast('Link copied');
+    } catch (_) {
+      el.shareLink.select();
+      document.execCommand && document.execCommand('copy');
+      toast('Link selected. Press Ctrl+C / Cmd+C to copy.');
+    }
+  });
+
   // ---------- Map ----------
   const map = L.map('map', { zoomControl: true });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -55,26 +130,25 @@
 
   const customerLayer = L.layerGroup().addTo(map);
   const resultLayer = L.layerGroup().addTo(map);
+  const customerMarkers = new Map(); // customer id -> Leaflet marker
+  const resultMarkers = new Map();   // osmId -> Leaflet marker
+  const MAP_VIEW_KEY = 'salesmap.view.v1';
+  let initialViewSet = false;
 
   function restoreView() {
     try {
       const saved = JSON.parse(localStorage.getItem(MAP_VIEW_KEY));
       if (saved && Number.isFinite(saved.lat) && Number.isFinite(saved.lng) && Number.isFinite(saved.zoom)) {
         map.setView([saved.lat, saved.lng], saved.zoom);
+        initialViewSet = true;
         return;
       }
     } catch (_) { /* ignore */ }
-    const located = customers.filter(c => c.lat != null && c.lng != null);
-    if (located.length) {
-      map.fitBounds(located.map(c => [c.lat, c.lng]), { padding: [40, 40], maxZoom: 14 });
-    } else {
-      map.setView([39.8283, -98.5795], 4); // continental US
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          pos => map.setView([pos.coords.latitude, pos.coords.longitude], 13),
-          () => {}, { timeout: 5000 }
-        );
-      }
+    map.setView([39.8283, -98.5795], 4); // continental US until we know better
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        if (!initialViewSet) { map.setView([pos.coords.latitude, pos.coords.longitude], 13); initialViewSet = true; }
+      }, () => {}, { timeout: 5000 });
     }
   }
   restoreView();
@@ -97,7 +171,9 @@
     return STATUSES.map(s => `<option value="${s.id}" ${s.id === selected ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('');
   }
 
-  function customerPopupHtml(c) {
+  function customerPopupHtml(id) {
+    const c = customers.find(x => x.id === id);
+    if (!c) return '<div class="popup">This customer was removed.</div>';
     const s = getStatus(c.status);
     return `
       <div class="popup" data-id="${escapeHtml(c.id)}">
@@ -114,67 +190,77 @@
       </div>`;
   }
 
+  // Incremental update so live changes from teammates don't disturb the map.
   function renderCustomerMarkers() {
-    customerLayer.clearLayers();
-    customerMarkers.clear();
+    const seen = new Set();
     for (const c of customers) {
       if (c.lat == null || c.lng == null) continue;
-      const marker = L.marker([c.lat, c.lng], { icon: markerIcon(getStatus(c.status).color, false), title: c.name });
-      marker.bindPopup(() => customerPopupHtml(c), { minWidth: 220 });
-      marker.addTo(customerLayer);
-      customerMarkers.set(c.id, marker);
+      seen.add(c.id);
+      const color = getStatus(c.status).color;
+      let marker = customerMarkers.get(c.id);
+      if (!marker) {
+        marker = L.marker([c.lat, c.lng], { icon: markerIcon(color, false), title: c.name });
+        marker.bindPopup(() => customerPopupHtml(c.id), { minWidth: 220 });
+        marker.addTo(customerLayer);
+        customerMarkers.set(c.id, marker);
+        marker._salesColor = color;
+      } else {
+        const pos = marker.getLatLng();
+        if (pos.lat !== c.lat || pos.lng !== c.lng) marker.setLatLng([c.lat, c.lng]);
+        if (marker._salesColor !== color) { marker.setIcon(markerIcon(color, false)); marker._salesColor = color; }
+      }
+    }
+    for (const [id, marker] of customerMarkers) {
+      if (!seen.has(id)) { customerLayer.removeLayer(marker); customerMarkers.delete(id); }
     }
   }
 
-  // Popup interactions (event delegation on the map container)
+  // Popup interactions
   map.on('popupopen', e => {
     const root = e.popup.getElement();
     if (!root) return;
-    const box = root.querySelector('.popup');
+    const box = root.querySelector('.popup[data-id]');
     if (!box) return;
     const id = box.dataset.id;
     const select = box.querySelector('.popup-status');
     if (select) {
-      select.addEventListener('change', () => {
-        updateCustomer(id, { status: select.value });
+      select.addEventListener('change', async () => {
         select.style.borderLeftColor = getStatus(select.value).color;
-        toast('Status updated');
+        await updateCustomer(id, { status: select.value }, 'Status updated');
       });
     }
-    const editBtn = box.querySelector('.popup-edit');
-    if (editBtn) editBtn.addEventListener('click', () => { map.closePopup(); startEdit(id); });
-    const delBtn = box.querySelector('.popup-delete');
-    if (delBtn) delBtn.addEventListener('click', () => { map.closePopup(); deleteCustomer(id); });
+    box.querySelector('.popup-edit').addEventListener('click', () => { map.closePopup(); startEdit(id); });
+    box.querySelector('.popup-delete').addEventListener('click', () => { map.closePopup(); deleteCustomer(id); });
   });
 
-  // ---------- Customer CRUD ----------
-  function persist() {
-    if (!Storage.save(customers)) toast('Could not save to this browser. Storage may be full or disabled.', true);
-    renderAll();
+  // ---------- Customer CRUD (through the store) ----------
+  async function withErrors(promise, successMsg) {
+    try {
+      const result = await promise;
+      if (successMsg) toast(successMsg);
+      return result;
+    } catch (err) {
+      console.error(err);
+      toast('Save failed: ' + (err.message || 'unknown error'), true);
+      return null;
+    }
   }
 
-  function addCustomer(data) {
-    const c = sanitizeCustomer({ ...data, id: generateId() });
-    if (!c) return null;
-    customers.push(c);
-    persist();
-    return c;
+  function addCustomer(data, successMsg) {
+    return withErrors(store.put({ ...data, id: generateId() }), successMsg);
   }
 
-  function updateCustomer(id, changes) {
-    const idx = customers.findIndex(c => c.id === id);
-    if (idx === -1) return;
-    customers[idx] = sanitizeCustomer({ ...customers[idx], ...changes, updatedAt: new Date().toISOString() });
-    persist();
+  function updateCustomer(id, changes, successMsg) {
+    const existing = customers.find(c => c.id === id);
+    if (!existing) return Promise.resolve(null);
+    return withErrors(store.put({ ...existing, ...changes, updatedAt: new Date().toISOString() }), successMsg);
   }
 
   function deleteCustomer(id) {
     const c = customers.find(x => x.id === id);
     if (!c) return;
-    if (!confirm(`Delete "${c.name}" from your customer list?`)) return;
-    customers = customers.filter(x => x.id !== id);
-    persist();
-    toast('Customer deleted');
+    if (!confirm(`Delete "${c.name}" from the customer list?`)) return;
+    withErrors(store.remove(id), 'Customer deleted');
   }
 
   function findByOsmId(osmId) {
@@ -258,6 +344,8 @@
   });
 
   // ---------- Search (Overpass) ----------
+  let searchResults = [];
+
   function setSearchStatus(msg, isError) {
     el.searchStatus.textContent = msg || '';
     el.searchStatus.classList.toggle('error', !!isError);
@@ -316,8 +404,6 @@
   }
 
   function renderSearchResults() {
-    resultLayer.clearLayers();
-    resultMarkers.clear();
     el.searchActions.classList.toggle('hidden', searchResults.length === 0);
 
     el.searchResults.innerHTML = searchResults.map(r => {
@@ -337,23 +423,28 @@
         </li>`;
     }).join('');
 
+    // Result pins only for businesses not yet in the list (those show as customer pins).
+    const seen = new Set();
     for (const r of searchResults) {
-      if (findByOsmId(r.osmId)) continue; // already shown as a customer marker
+      if (findByOsmId(r.osmId)) continue;
+      seen.add(r.osmId);
+      if (resultMarkers.has(r.osmId)) continue;
       const marker = L.marker([r.lat, r.lng], { icon: markerIcon('#ffffff', true), title: r.name });
       marker.bindPopup(() => resultPopupHtml(r), { minWidth: 220 });
       marker.addTo(resultLayer);
       resultMarkers.set(r.osmId, marker);
     }
+    for (const [osmId, marker] of resultMarkers) {
+      if (!seen.has(osmId)) { resultLayer.removeLayer(marker); resultMarkers.delete(osmId); }
+    }
   }
 
-  // Result popup interactions
   map.on('popupopen', e => {
     const root = e.popup.getElement();
     const box = root && root.querySelector('.popup[data-osm]');
     if (!box) return;
     const osmId = box.dataset.osm;
-    const addBtn = box.querySelector('.result-add');
-    if (addBtn) addBtn.addEventListener('click', () => {
+    box.querySelector('.result-add').addEventListener('click', () => {
       const status = box.querySelector('.result-status').value;
       map.closePopup();
       addResultAsCustomer(osmId, status);
@@ -374,24 +465,25 @@
     }
   });
 
+  function resultToCustomer(r, status) {
+    return {
+      id: generateId(), name: r.name, address: r.address, status,
+      notes: [r.phone, r.website].filter(Boolean).join(' · '),
+      lat: r.lat, lng: r.lng, osmId: r.osmId,
+    };
+  }
+
   function addResultAsCustomer(osmId, status) {
     const r = searchResults.find(x => x.osmId === osmId);
     if (!r || findByOsmId(osmId)) return;
-    const notes = [r.phone, r.website].filter(Boolean).join(' · ');
-    const c = addCustomer({ name: r.name, address: r.address, status, notes, lat: r.lat, lng: r.lng, osmId });
-    if (c) toast(`Added "${c.name}"`);
+    withErrors(store.put(resultToCustomer(r, status)), `Added "${r.name}"`);
   }
 
   el.addAllBtn.addEventListener('click', () => {
     const fresh = searchResults.filter(r => !findByOsmId(r.osmId));
     if (!fresh.length) { toast('All results are already in your list.'); return; }
-    if (!confirm(`Add ${fresh.length} businesses to your customer list as "Not a Customer"?`)) return;
-    for (const r of fresh) {
-      const notes = [r.phone, r.website].filter(Boolean).join(' · ');
-      customers.push(sanitizeCustomer({ id: generateId(), name: r.name, address: r.address, status: DEFAULT_STATUS, notes, lat: r.lat, lng: r.lng, osmId: r.osmId }));
-    }
-    persist();
-    toast(`Added ${fresh.length} businesses`);
+    if (!confirm(`Add ${fresh.length} businesses to the customer list as "Not a Customer"?`)) return;
+    withErrors(store.putMany(fresh.map(r => resultToCustomer(r, DEFAULT_STATUS))), `Added ${fresh.length} businesses`);
   });
 
   el.clearResultsBtn.addEventListener('click', () => {
@@ -436,7 +528,7 @@
     el.customerName.focus();
   }
 
-  el.cancelEditBtn.addEventListener('click', () => { resetForm(); switchTab('customers'); });
+  el.cancelEditBtn.addEventListener('click', () => { clearPreviewMarker(); resetForm(); switchTab('customers'); });
 
   el.geocodeBtn.addEventListener('click', async () => {
     const address = el.customerAddress.value.trim();
@@ -459,6 +551,7 @@
   });
 
   let previewMarker = null;
+  let pickingLocation = false;
   function showPreviewMarker(lat, lng) {
     if (previewMarker) previewMarker.remove();
     previewMarker = L.marker([lat, lng], { icon: markerIcon('#ef4444', false), zIndexOffset: 1000 }).addTo(map);
@@ -524,27 +617,21 @@
         const geo = await geocodeAddress(data.address);
         if (geo) { data.lat = geo.lat; data.lng = geo.lng; }
         else if (data.lat == null) {
-          setLocationStatus('Address not found. Saved without a map location; use "Pick location on map" to place it.', true);
-          toast('Address not found. Saved without a map location.', true);
+          toast('Address not found. Saved without a map location; edit it and use "Pick location on map".', true);
         }
       } catch (err) {
-        setLocationStatus('Address lookup failed. Saved without a map location.', true);
+        toast('Address lookup failed. Saved without a map location.', true);
       }
     }
 
-    let saved;
-    if (existing) {
-      updateCustomer(id, data);
-      saved = customers.find(c => c.id === id);
-      toast(`Updated "${saved.name}"`);
-    } else {
-      saved = addCustomer(data);
-      toast(`Added "${saved.name}"`);
-    }
+    const saved = existing
+      ? await updateCustomer(id, data, `Updated "${data.name}"`)
+      : await addCustomer(data, `Added "${data.name}"`);
+    if (!saved) return; // error already shown; keep the form so nothing is lost
     clearPreviewMarker();
     resetForm();
     switchTab('customers');
-    if (saved && saved.lat != null) focusCustomer(saved.id);
+    if (saved.lat != null) setTimeout(() => focusCustomer(saved.id), 50);
   });
 
   // ---------- Import / Export ----------
@@ -558,6 +645,17 @@
     downloadFile(`sales-map-${stamp}.csv`, customersToCsv(customers), 'text/csv');
   });
 
+  function mergeIncoming(incoming) {
+    const toWrite = [];
+    let added = 0, updated = 0;
+    for (const c of incoming) {
+      const match = customers.find(x => x.id === c.id || (c.osmId && x.osmId === c.osmId));
+      if (!match) { toWrite.push(c); added++; }
+      else if (new Date(c.updatedAt) >= new Date(match.updatedAt)) { toWrite.push({ ...match, ...c, id: match.id }); updated++; }
+    }
+    return { toWrite, added, updated };
+  }
+
   el.importFile.addEventListener('change', async () => {
     const file = el.importFile.files[0];
     if (!file) return;
@@ -565,14 +663,8 @@
       const parsed = JSON.parse(await file.text());
       const list = Array.isArray(parsed) ? parsed : parsed.customers;
       if (!Array.isArray(list)) throw new Error('File does not contain a customer list');
-      const incoming = list.map(sanitizeCustomer).filter(Boolean);
-      let added = 0, updated = 0;
-      for (const c of incoming) {
-        const idx = customers.findIndex(x => x.id === c.id || (c.osmId && x.osmId === c.osmId));
-        if (idx === -1) { customers.push(c); added++; }
-        else if (new Date(c.updatedAt) >= new Date(customers[idx].updatedAt)) { customers[idx] = { ...customers[idx], ...c, id: customers[idx].id }; updated++; }
-      }
-      persist();
+      const { toWrite, added, updated } = mergeIncoming(list.map(sanitizeCustomer).filter(Boolean));
+      await store.putMany(toWrite);
       toast(`Imported ${added} new and ${updated} updated customers`);
     } catch (err) {
       toast('Import failed: ' + err.message, true);
@@ -580,6 +672,26 @@
       el.importFile.value = '';
     }
   });
+
+  // Offer to move customers saved on this device (before sharing was set up) into the shared list.
+  function offerLocalUpload() {
+    if (!store.shared) return;
+    let dismissed = false;
+    try { dismissed = localStorage.getItem('salesmap.localUploadDismissed.v1') === '1'; } catch (_) {}
+    const local = Storage.load();
+    if (dismissed || !local.length) return;
+    el.localBannerText.textContent = `${local.length} customer${local.length === 1 ? '' : 's'} saved on this device before sharing was set up.`;
+    el.localBanner.classList.remove('hidden');
+    el.uploadLocalBtn.addEventListener('click', async () => {
+      const { toWrite, added, updated } = mergeIncoming(local);
+      const ok = await withErrors(store.putMany(toWrite).then(() => true), `Uploaded ${added} new and ${updated} updated customers to the shared map`);
+      if (ok) { Storage.save([]); el.localBanner.classList.add('hidden'); }
+    });
+    el.dismissLocalBtn.addEventListener('click', () => {
+      try { localStorage.setItem('salesmap.localUploadDismissed.v1', '1'); } catch (_) {}
+      el.localBanner.classList.add('hidden');
+    });
+  }
 
   // ---------- Tabs & sidebar ----------
   function switchTab(name) {
@@ -596,6 +708,31 @@
   // ---------- Init ----------
   el.customerStatus.innerHTML = statusOptionsHtml(DEFAULT_STATUS);
   el.filterStatus.innerHTML = '<option value="">All statuses</option>' + STATUSES.map(s => `<option value="${s.id}">${escapeHtml(s.label)}</option>`).join('');
-  renderAll();
-  if (window.innerWidth < 800 && customers.length) el.sidebar.classList.add('collapsed');
+
+  store = chooseStore();
+  if (!store) return; // landing screen shown or redirecting
+
+  let firstLoad = true;
+  store.subscribe((list, err) => {
+    customers = list;
+    renderAll();
+    if (err) { toast('Could not read the shared list: ' + (err.message || err.code || 'permission denied'), true); return; }
+    if (firstLoad) {
+      firstLoad = false;
+      const located = customers.filter(c => c.lat != null && c.lng != null);
+      if (!initialViewSet && located.length) {
+        map.fitBounds(located.map(c => [c.lat, c.lng]), { padding: [40, 40], maxZoom: 14 });
+        initialViewSet = true;
+      }
+      if (window.innerWidth < 800 && customers.length) el.sidebar.classList.add('collapsed');
+      offerLocalUpload();
+    }
+  });
+
+  store.onConnection(connected => {
+    el.connection.classList.remove('hidden');
+    el.connection.textContent = connected ? 'Live' : 'Offline';
+    el.connection.title = connected ? 'Connected. Changes are shared instantly.' : 'No connection. Changes will sync when you are back online.';
+    el.connection.classList.toggle('offline', !connected);
+  });
 })();

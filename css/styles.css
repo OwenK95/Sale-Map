@@ -31,6 +31,30 @@ body { background: var(--bg); color: var(--text); font-size: 14px; display: flex
 .topbar .btn { background: #374151; color: #fff; border-color: #4b5563; }
 .topbar .btn:hover { background: #4b5563; }
 
+.mode-badge { font-size: 11px; color: #9ca3af; border: 1px solid #374151; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.conn-badge { font-size: 11px; font-weight: 600; color: #34d399; white-space: nowrap; }
+.conn-badge::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 4px; }
+.conn-badge.offline { color: #fbbf24; }
+.topbar .btn-share { background: var(--primary); border-color: var(--primary); }
+.topbar .btn-share:hover { background: var(--primary-hover); }
+
+/* Overlays & dialogs */
+.overlay { position: fixed; inset: 0; background: rgba(17,24,39,0.6); z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.dialog { background: #fff; border-radius: 10px; padding: 22px; width: 100%; max-width: 440px; box-shadow: 0 10px 40px rgba(0,0,0,0.3); }
+.dialog h2 { margin: 0 0 8px; font-size: 20px; }
+.dialog p { margin: 0 0 14px; color: #374151; line-height: 1.5; }
+.dialog .field-row { flex-wrap: nowrap; }
+.dialog-actions { justify-content: flex-end; margin: 12px 0 0; }
+.btn-block { width: 100%; padding: 11px; font-size: 15px; }
+.or-divider { text-align: center; color: var(--muted); font-size: 12px; margin: 14px 0; text-transform: uppercase; letter-spacing: 0.08em; }
+
+.banner {
+  position: absolute; top: calc(var(--topbar-height) + 10px); left: 50%; transform: translateX(-50%);
+  background: #fffbeb; border: 1px solid #fcd34d; color: #78350f; padding: 8px 12px; border-radius: 8px;
+  z-index: 1200; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; max-width: 90vw;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
 /* Layout */
 .layout { flex: 1; display: flex; min-height: 0; position: relative; }
 .sidebar {
@@ -160,7 +184,8 @@ textarea { resize: vertical; }
   .topbar h1 { font-size: 16px; white-space: nowrap; }
   .topbar-actions { width: 100%; gap: 6px; }
   .topbar .btn-sm { padding: 4px 8px; font-size: 11px; }
-  .count-badge { display: none; }
+  .count-badge, .mode-badge { display: none; }
+  .banner { top: auto; bottom: 70px; }
   .sidebar { position: absolute; inset: 0; z-index: 1500; width: 100%; }
   .sidebar.collapsed { margin-left: -100%; }
 }

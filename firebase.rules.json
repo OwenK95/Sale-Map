@@ -1,0 +1,17 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "teams": {
+      "$team": {
+        ".read": "$team.matches(/^[A-Za-z0-9_-]{24,64}$/)",
+        ".write": "$team.matches(/^[A-Za-z0-9_-]{24,64}$/)",
+        "customers": {
+          "$id": {
+            ".validate": "newData.hasChildren(['name', 'status']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 200 && newData.child('status').isString()"
+          }
+        }
+      }
+    }
+  }
+}
