@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sales Map</title>
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <button id="toggleSidebar" class="icon-btn" title="Toggle panel" aria-label="Toggle panel">&#9776;</button>
+    <h1>Sales Map</h1>
+    <div class="topbar-actions">
+      <span id="customerCount" class="count-badge">0 customers</span>
+      <button id="exportJsonBtn" class="btn btn-sm" title="Download all customers as a JSON backup">Export JSON</button>
+      <button id="exportCsvBtn" class="btn btn-sm" title="Download all customers as a spreadsheet (CSV)">Export CSV</button>
+      <label class="btn btn-sm" title="Import a JSON backup (merges with existing customers)">
+        Import JSON <input type="file" id="importFile" accept=".json,application/json" hidden />
+      </label>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside id="sidebar" class="sidebar">
+      <nav class="tabs" role="tablist">
+        <button class="tab active" data-tab="customers" role="tab">Customers</button>
+        <button class="tab" data-tab="search" role="tab">Find Restaurants</button>
+        <button class="tab" data-tab="add" role="tab">Add Customer</button>
+      </nav>
+
+      <!-- Customers tab -->
+      <section id="tab-customers" class="tab-panel active" role="tabpanel">
+        <div class="field-row">
+          <input type="search" id="customerFilterText" placeholder="Search name or address..." />
+        </div>
+        <div class="field-row">
+          <select id="customerFilterStatus">
+            <option value="">All statuses</option>
+          </select>
+        </div>
+        <div id="legend" class="legend"></div>
+        <ul id="customerList" class="list"></ul>
+        <p id="customerEmpty" class="empty-msg">No customers yet. Use <strong>Find Restaurants</strong> to search an area, or <strong>Add Customer</strong> to enter one manually.</p>
+      </section>
+
+      <!-- Search tab -->
+      <section id="tab-search" class="tab-panel" role="tabpanel">
+        <form id="searchForm" class="form">
+          <label>
+            Location (city, ZIP, or address)
+            <input type="text" id="searchLocation" placeholder="Leave blank to use the map center" />
+          </label>
+          <label>
+            Search radius
+            <select id="searchRadius">
+              <option value="1">1 mile</option>
+              <option value="2">2 miles</option>
+              <option value="3" selected>3 miles</option>
+              <option value="5">5 miles</option>
+              <option value="10">10 miles</option>
+            </select>
+          </label>
+          <label>
+            Business types
+            <select id="searchTypes">
+              <option value="restaurants">Restaurants only</option>
+              <option value="food" selected>Restaurants, fast food, cafes, bars &amp; pubs</option>
+              <option value="all">All food businesses (incl. hotels, supermarkets, bakeries)</option>
+            </select>
+          </label>
+          <button type="submit" id="searchBtn" class="btn btn-primary">Search this area</button>
+          <p class="hint">Results come from OpenStreetMap. Businesses already in your customer list are shown with their status.</p>
+        </form>
+        <div id="searchStatus" class="status-msg"></div>
+        <div id="searchActions" class="field-row hidden">
+          <button id="addAllBtn" class="btn btn-sm">Add all new results as "Not a Customer"</button>
+          <button id="clearResultsBtn" class="btn btn-sm btn-ghost">Clear results</button>
+        </div>
+        <ul id="searchResults" class="list"></ul>
+      </section>
+
+      <!-- Add / Edit tab -->
+      <section id="tab-add" class="tab-panel" role="tabpanel">
+        <form id="customerForm" class="form">
+          <input type="hidden" id="customerId" />
+          <h2 id="formTitle">Add Customer</h2>
+          <label>
+            Restaurant / company name *
+            <input type="text" id="customerName" required placeholder="e.g. Joe's Diner" />
+          </label>
+          <label>
+            Address *
+            <input type="text" id="customerAddress" required placeholder="123 Main St, Springfield, IL 62701" />
+          </label>
+          <label>
+            Status *
+            <select id="customerStatus" required></select>
+          </label>
+          <label>
+            Notes (optional)
+            <textarea id="customerNotes" rows="3" placeholder="Contact name, phone, best time to visit..."></textarea>
+          </label>
+          <div class="field-row">
+            <button type="button" id="geocodeBtn" class="btn btn-sm">Find address on map</button>
+            <button type="button" id="pickOnMapBtn" class="btn btn-sm btn-ghost">Pick location on map</button>
+          </div>
+          <p id="locationStatus" class="hint">Location will be looked up automatically from the address when you save.</p>
+          <input type="hidden" id="customerLat" />
+          <input type="hidden" id="customerLng" />
+          <div class="field-row">
+            <button type="submit" class="btn btn-primary">Save Customer</button>
+            <button type="button" id="cancelEditBtn" class="btn btn-ghost hidden">Cancel</button>
+          </div>
+        </form>
+      </section>
+    </aside>
+
+    <main class="map-wrap">
+      <div id="map"></div>
+      <div id="mapHint" class="map-hint hidden">Click on the map to set the customer's location. <button id="cancelPickBtn" class="link-btn">Cancel</button></div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="js/statuses.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/geo.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
