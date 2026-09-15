@@ -21,5 +21,13 @@
 // each device (single-user mode).
 // ---------------------------------------------------------------------------
 window.SALES_MAP_CONFIG = {
-  firebase: null,
+  firebase: {
+  apiKey: "AIzaSyBWwl1rVvnbRkW3zr0sOcurxKBatG0oNZI",
+  authDomain: "sales-map-2e908.firebaseapp.com",
+  databaseURL: "https://sales-map-2e908-default-rtdb.firebaseio.com",
+  projectId: "sales-map-2e908",
+  storageBucket: "sales-map-2e908.firebasestorage.app",
+  messagingSenderId: "352129102460",
+  appId: "1:352129102460:web:755d2a2f32702b36720ff9"
+  },
 };
