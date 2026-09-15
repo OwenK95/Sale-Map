@@ -71,11 +71,22 @@ You do this once. Afterwards nobody needs to touch Firebase or GitHub again.
 
 ### Step 3 – Publish the app on GitHub Pages
 
-1. In this GitHub repository open **Settings → Pages**.
-2. Under *Build and deployment* choose **Deploy from a branch**, select the `main` branch
-   and the `/ (root)` folder, and click **Save**.
-3. After a minute the page shows the address, something like
-   `https://<your-username>.github.io/Sale-Map/`.
+GitHub Pages is free only for **public** repositories. If the repository is private, the
+Pages settings page shows no *Build and deployment* section, just a note about upgrading.
+Making it public is safe: the repository contains only the app code and the Firebase
+project id, not the customer data or the secret team key.
+
+1. Open **Settings → General**, scroll to the bottom (*Danger Zone*), click
+   **Change visibility → Make public**, and confirm. (Alternatively, a paid GitHub Pro plan
+   allows Pages on private repositories.)
+2. Open **Settings → Pages**.
+3. Under *Build and deployment* choose **Deploy from a branch**. In the *Branch* dropdown
+   pick the repository's default branch (the one already selected when you view the code,
+   currently `claude/sleepy-hamilton-y2c30w`), keep the `/ (root)` folder, and click
+   **Save**.
+4. After a minute or two the page shows the address, something like
+   `https://<your-username>.github.io/Sale-Map/`. Refresh the settings page if it does not
+   appear right away.
 
 ### Step 4 – Create the shared map and send the link
 
