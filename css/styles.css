@@ -158,6 +158,10 @@ textarea { resize: vertical; }
   background: rgba(255,255,255,0.85); top: 6px; left: 6px;
 }
 .pin-result { border-color: #6b7280; border-style: dashed; }
+/* The "about to be placed" pin, kept visually distinct from every status color. */
+.pin-preview { animation: pin-pulse 1.2s ease-in-out infinite; }
+@keyframes pin-pulse { 0%, 100% { box-shadow: 0 2px 4px rgba(0,0,0,0.4); } 50% { box-shadow: 0 2px 4px rgba(0,0,0,0.4), 0 0 0 7px rgba(236,72,153,0.35); } }
+@media (prefers-reduced-motion: reduce) { .pin-preview { animation: none; } }
 .pin-result::after { background: #6b7280; }
 
 /* Popups */

@@ -21,9 +21,21 @@ computer being on:
   address is located on the map automatically, or click the map to place it.
 - **Customer list** – filter by name, address, or status. Click a customer to jump to it on
   the map. Change status straight from the map pin's popup.
-- **Statuses** (each has its own pin color): Not a Customer · Talked To ·
-  Service Grease Trap (No Contract) · Service Oil (No Contract) ·
-  Service Grease Trap (Contract) · Service Oil (Contract) · Service Both Oil and Grease
+- **Statuses**, each with its own pin color:
+
+  | Status | Pin |
+  |---|---|
+  | Not a Customer | Gray |
+  | Prospected | Red |
+  | Follow-Up Needed | Orange |
+  | Decision Maker Unavailable | Yellow |
+  | Grease Trap Service Contract | Blue |
+  | Used Cooking Oil (UCO) Contract | Green |
+  | Grease Trap and UCO Contracts | Purple |
+
+  To rename, recolor, or add a status, edit `js/statuses.js`. Everything else in the app
+  follows from that list. Customers saved under a previous version's status are mapped to
+  the closest current one automatically, so renaming never loses data.
 - **Share link** – one button gives you the link to send to the team.
 - **Export / Import** – download the list as JSON (backup) or CSV (spreadsheet).
 - **Works on phones** – the layout adapts to small screens for salespeople in the field.

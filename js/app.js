@@ -157,10 +157,10 @@
     try { localStorage.setItem(MAP_VIEW_KEY, JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() })); } catch (_) {}
   });
 
-  function markerIcon(color, isResult) {
+  function markerIcon(color, isResult, isPreview) {
     return L.divIcon({
       className: 'pin-icon',
-      html: `<span class="pin ${isResult ? 'pin-result' : ''}" style="--pin-color:${color}"></span>`,
+      html: `<span class="pin ${isResult ? 'pin-result' : ''} ${isPreview ? 'pin-preview' : ''}" style="--pin-color:${color}"></span>`,
       iconSize: [24, 32],
       iconAnchor: [12, 32],
       popupAnchor: [0, -30],
@@ -304,7 +304,7 @@
           <div class="list-body">
             <div class="list-title">${escapeHtml(c.name)}</div>
             <div class="list-sub">${escapeHtml(c.address || 'No address')}</div>
-            <div class="list-status" style="color:${s.color}">${escapeHtml(s.label)}${c.lat == null ? ' &middot; <em>not on map</em>' : ''}</div>
+            <div class="list-status" style="color:${s.textColor}">${escapeHtml(s.label)}${c.lat == null ? ' &middot; <em>not on map</em>' : ''}</div>
           </div>
           <div class="list-actions">
             <button class="icon-btn small edit-btn" title="Edit">&#9998;</button>
@@ -415,7 +415,7 @@
           <div class="list-body">
             <div class="list-title">${escapeHtml(r.name)}</div>
             <div class="list-sub">${escapeHtml(r.address || 'Address not listed')}${r.category ? ` &middot; ${escapeHtml(r.category)}` : ''}</div>
-            ${existing ? `<div class="list-status" style="color:${s.color}">In list: ${escapeHtml(s.label)}</div>` : ''}
+            ${existing ? `<div class="list-status" style="color:${s.textColor}">In list: ${escapeHtml(s.label)}</div>` : ''}
           </div>
           <div class="list-actions">
             ${existing ? '' : `<button class="btn btn-sm add-result-btn">Add</button>`}
@@ -554,7 +554,7 @@
   let pickingLocation = false;
   function showPreviewMarker(lat, lng) {
     if (previewMarker) previewMarker.remove();
-    previewMarker = L.marker([lat, lng], { icon: markerIcon('#ef4444', false), zIndexOffset: 1000 }).addTo(map);
+    previewMarker = L.marker([lat, lng], { icon: markerIcon('#ec4899', false, true), zIndexOffset: 1000 }).addTo(map);
   }
   function clearPreviewMarker() {
     if (previewMarker) { previewMarker.remove(); previewMarker = null; }
