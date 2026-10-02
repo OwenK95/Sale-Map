@@ -25,6 +25,38 @@ const Storage = {
   },
 };
 
+// Follow-up dates are plain calendar dates stored as YYYY-MM-DD, the format an
+// <input type="date"> produces. They are compared as strings against today's local date,
+// which avoids the timezone bug you get from `new Date('2026-10-15')`: that parses as UTC
+// midnight and reads as the previous day in every US timezone.
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function isValidIsoDate(value) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  return dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d;
+}
+
+// 'overdue' | 'today' | 'upcoming', or null when there is no date.
+function dueState(iso) {
+  if (!isValidIsoDate(iso)) return null;
+  const today = todayIso();
+  if (iso < today) return 'overdue';
+  if (iso === today) return 'today';
+  return 'upcoming';
+}
+
+// Builds the date locally so it does not shift across timezones.
+function formatDateLabel(iso) {
+  if (!isValidIsoDate(iso)) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 function generateId() {
   if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
   return 'c_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
@@ -37,11 +69,16 @@ function sanitizeCustomer(c) {
   if (!name) return null;
   const lat = Number(c.lat);
   const lng = Number(c.lng);
+  const status = normalizeStatus(c.status);
+  // A follow-up date only means something for the statuses that use one. Dropping it
+  // otherwise stops a stale date from riding along on a customer who has since signed.
+  const followUpDate = statusNeedsDate(status) && isValidIsoDate(c.followUpDate) ? c.followUpDate : null;
   return {
     id: c.id ? String(c.id) : generateId(),
     name,
     address: String(c.address || '').trim(),
-    status: normalizeStatus(c.status),
+    status,
+    followUpDate,
     notes: String(c.notes || '').trim(),
     lat: Number.isFinite(lat) ? lat : null,
     lng: Number.isFinite(lng) ? lng : null,
@@ -52,13 +89,13 @@ function sanitizeCustomer(c) {
 }
 
 function customersToCsv(customers) {
-  const header = ['Name', 'Address', 'Status', 'Notes', 'Latitude', 'Longitude'];
+  const header = ['Name', 'Address', 'Status', 'Follow-Up Date', 'Notes', 'Latitude', 'Longitude'];
   const escape = v => {
     const s = v == null ? '' : String(v);
     return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   };
   const rows = customers.map(c => [
-    c.name, c.address, getStatus(c.status).label, c.notes, c.lat ?? '', c.lng ?? '',
+    c.name, c.address, getStatus(c.status).label, c.followUpDate ?? '', c.notes, c.lat ?? '', c.lng ?? '',
   ].map(escape).join(','));
   return [header.join(','), ...rows].join('\r\n');
 }

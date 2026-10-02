@@ -9,8 +9,8 @@
 const STATUSES = [
   { id: 'not_customer',        label: 'Not a Customer',                   color: '#6b7280', textColor: '#6b7280' }, // gray
   { id: 'prospected',          label: 'Prospected',                       color: '#dc2626', textColor: '#dc2626' }, // red
-  { id: 'follow_up',           label: 'Follow-Up Needed',                 color: '#f97316', textColor: '#c2410c' }, // orange
-  { id: 'dm_unavailable',      label: 'Decision Maker Unavailable',       color: '#facc15', textColor: '#a16207' }, // yellow
+  { id: 'follow_up',           label: 'Follow-Up Needed',                 color: '#f97316', textColor: '#c2410c', needsDate: true }, // orange
+  { id: 'dm_unavailable',      label: 'Decision Maker Unavailable',       color: '#facc15', textColor: '#a16207', needsDate: true }, // yellow
   { id: 'grease_contract',     label: 'Grease Trap Service Contract',     color: '#2563eb', textColor: '#2563eb' }, // blue
   { id: 'uco_contract',        label: 'Used Cooking Oil (UCO) Contract',  color: '#16a34a', textColor: '#15803d' }, // green
   { id: 'grease_uco_contract', label: 'Grease Trap and UCO Contracts',    color: '#7c3aed', textColor: '#7c3aed' }, // purple
@@ -44,6 +44,12 @@ const STATUS_MIGRATIONS = {
   'service oil (contract)': 'uco_contract',
   'service both oil and grease': 'grease_uco_contract',
 };
+
+// True for statuses that carry a follow-up date. Add `needsDate: true` to any status
+// above to give it a date field; the form, the pin popup and the list all follow.
+function statusNeedsDate(id) {
+  return !!getStatus(id).needsDate;
+}
 
 function getStatus(id) {
   return STATUS_BY_ID[id] || STATUS_BY_ID[DEFAULT_STATUS];

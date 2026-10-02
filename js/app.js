@@ -18,6 +18,7 @@
     customerForm: $('customerForm'), formTitle: $('formTitle'), customerId: $('customerId'),
     customerName: $('customerName'), customerAddress: $('customerAddress'),
     customerStatus: $('customerStatus'), customerNotes: $('customerNotes'),
+    followUpDateField: $('followUpDateField'), customerFollowUpDate: $('customerFollowUpDate'),
     customerLat: $('customerLat'), customerLng: $('customerLng'),
     geocodeBtn: $('geocodeBtn'), pickOnMapBtn: $('pickOnMapBtn'), locationStatus: $('locationStatus'),
     cancelEditBtn: $('cancelEditBtn'),
@@ -167,6 +168,24 @@
     });
   }
 
+  // One-line summary of a customer's follow-up date, emphasised once it comes due.
+  function dueLineHtml(c, prefix) {
+    const state = dueState(c.followUpDate);
+    if (!state) return '';
+    const date = formatDateLabel(c.followUpDate);
+    const text = state === 'overdue' ? `Follow-up overdue since ${date}`
+      : state === 'today' ? 'Follow-up due today'
+      : `Follow up on ${date}`;
+    return `<div class="${prefix}-due due-${state}">${escapeHtml(text)}</div>`;
+  }
+
+  // The date field shown inside a popup, revealed only for statuses that use a date.
+  function popupDateRowHtml(statusId, value) {
+    return `<label class="popup-label popup-date-row ${statusNeedsDate(statusId) ? '' : 'hidden'}">Follow-up date
+          <input type="date" class="popup-date" value="${escapeHtml(value || '')}" />
+        </label>`;
+  }
+
   function statusOptionsHtml(selected) {
     return STATUSES.map(s => `<option value="${s.id}" ${s.id === selected ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('');
   }
@@ -180,9 +199,11 @@
         <div class="popup-title">${escapeHtml(c.name)}</div>
         <div class="popup-address">${escapeHtml(c.address || 'No address')}</div>
         ${c.notes ? `<div class="popup-notes">${escapeHtml(c.notes)}</div>` : ''}
+        ${dueLineHtml(c, 'popup')}
         <label class="popup-label">Status
           <select class="popup-status" style="border-left: 6px solid ${s.color}">${statusOptionsHtml(c.status)}</select>
         </label>
+        ${popupDateRowHtml(c.status, c.followUpDate)}
         <div class="popup-actions">
           <button class="btn btn-sm popup-edit">Edit</button>
           <button class="btn btn-sm btn-danger popup-delete">Delete</button>
@@ -223,10 +244,22 @@
     if (!box) return;
     const id = box.dataset.id;
     const select = box.querySelector('.popup-status');
+    const dateRow = box.querySelector('.popup-date-row');
+    const dateInput = box.querySelector('.popup-date');
     if (select) {
       select.addEventListener('change', async () => {
         select.style.borderLeftColor = getStatus(select.value).color;
-        await updateCustomer(id, { status: select.value }, 'Status updated');
+        const needs = statusNeedsDate(select.value);
+        dateRow.classList.toggle('hidden', !needs);
+        if (!needs) dateInput.value = '';
+        await updateCustomer(id, { status: select.value, followUpDate: needs ? dateInput.value : null }, 'Status updated');
+        if (needs && !dateInput.value) dateInput.focus();
+      });
+    }
+    if (dateInput) {
+      dateInput.addEventListener('change', async () => {
+        await updateCustomer(id, { followUpDate: dateInput.value || null },
+          dateInput.value ? 'Follow-up date set' : 'Follow-up date cleared');
       });
     }
     box.querySelector('.popup-edit').addEventListener('click', () => { map.closePopup(); startEdit(id); });
@@ -305,6 +338,7 @@
             <div class="list-title">${escapeHtml(c.name)}</div>
             <div class="list-sub">${escapeHtml(c.address || 'No address')}</div>
             <div class="list-status" style="color:${s.textColor}">${escapeHtml(s.label)}${c.lat == null ? ' &middot; <em>not on map</em>' : ''}</div>
+            ${dueLineHtml(c, 'list')}
           </div>
           <div class="list-actions">
             <button class="icon-btn small edit-btn" title="Edit">&#9998;</button>
@@ -397,6 +431,7 @@
         <label class="popup-label">Add as
           <select class="popup-status result-status">${statusOptionsHtml(DEFAULT_STATUS)}</select>
         </label>
+        ${popupDateRowHtml(DEFAULT_STATUS, '')}
         <div class="popup-actions">
           <button class="btn btn-sm btn-primary result-add">Add to customers</button>
         </div>
@@ -444,10 +479,18 @@
     const box = root && root.querySelector('.popup[data-osm]');
     if (!box) return;
     const osmId = box.dataset.osm;
+    const statusSel = box.querySelector('.result-status');
+    const dateRow = box.querySelector('.popup-date-row');
+    const dateInput = box.querySelector('.popup-date');
+    statusSel.addEventListener('change', () => {
+      const needs = statusNeedsDate(statusSel.value);
+      dateRow.classList.toggle('hidden', !needs);
+      if (!needs) dateInput.value = '';
+    });
     box.querySelector('.result-add').addEventListener('click', () => {
-      const status = box.querySelector('.result-status').value;
+      const status = statusSel.value;
       map.closePopup();
-      addResultAsCustomer(osmId, status);
+      addResultAsCustomer(osmId, status, statusNeedsDate(status) ? dateInput.value : null);
     });
   });
 
@@ -465,18 +508,18 @@
     }
   });
 
-  function resultToCustomer(r, status) {
+  function resultToCustomer(r, status, followUpDate) {
     return {
-      id: generateId(), name: r.name, address: r.address, status,
+      id: generateId(), name: r.name, address: r.address, status, followUpDate: followUpDate || null,
       notes: [r.phone, r.website].filter(Boolean).join(' · '),
       lat: r.lat, lng: r.lng, osmId: r.osmId,
     };
   }
 
-  function addResultAsCustomer(osmId, status) {
+  function addResultAsCustomer(osmId, status, followUpDate) {
     const r = searchResults.find(x => x.osmId === osmId);
     if (!r || findByOsmId(osmId)) return;
-    withErrors(store.put(resultToCustomer(r, status)), `Added "${r.name}"`);
+    withErrors(store.put(resultToCustomer(r, status, followUpDate)), `Added "${r.name}"`);
   }
 
   el.addAllBtn.addEventListener('click', () => {
@@ -498,12 +541,21 @@
     el.locationStatus.classList.toggle('error', !!isError);
   }
 
+  // The follow-up date field only appears for statuses that use one.
+  function syncFollowUpField() {
+    const needs = statusNeedsDate(el.customerStatus.value);
+    el.followUpDateField.classList.toggle('hidden', !needs);
+    if (!needs) el.customerFollowUpDate.value = '';
+  }
+
   function resetForm() {
     el.customerForm.reset();
     el.customerId.value = '';
     el.customerLat.value = '';
     el.customerLng.value = '';
     el.customerStatus.value = DEFAULT_STATUS;
+    el.customerFollowUpDate.value = '';
+    syncFollowUpField();
     el.formTitle.textContent = 'Add Customer';
     el.cancelEditBtn.classList.add('hidden');
     setLocationStatus('Location will be looked up automatically from the address when you save.');
@@ -518,6 +570,8 @@
     el.customerName.value = c.name;
     el.customerAddress.value = c.address;
     el.customerStatus.value = c.status;
+    el.customerFollowUpDate.value = c.followUpDate || '';
+    syncFollowUpField();
     el.customerNotes.value = c.notes;
     el.customerLat.value = c.lat ?? '';
     el.customerLng.value = c.lng ?? '';
@@ -601,6 +655,7 @@
       name: el.customerName.value.trim(),
       address: el.customerAddress.value.trim(),
       status: el.customerStatus.value,
+      followUpDate: el.customerFollowUpDate.value || null,
       notes: el.customerNotes.value.trim(),
       lat: el.customerLat.value === '' ? null : parseFloat(el.customerLat.value),
       lng: el.customerLng.value === '' ? null : parseFloat(el.customerLng.value),
@@ -706,6 +761,7 @@
   });
 
   // ---------- Init ----------
+  el.customerStatus.addEventListener('change', syncFollowUpField);
   el.customerStatus.innerHTML = statusOptionsHtml(DEFAULT_STATUS);
   el.filterStatus.innerHTML = '<option value="">All statuses</option>' + STATUSES.map(s => `<option value="${s.id}">${escapeHtml(s.label)}</option>`).join('');
 

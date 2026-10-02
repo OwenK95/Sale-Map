@@ -144,6 +144,20 @@ textarea { resize: vertical; }
 .list-sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 .list-status { font-size: 11px; font-weight: 600; margin-top: 2px; }
 .list-actions { display: flex; gap: 2px; align-items: center; flex-shrink: 0; }
+
+/* Follow-up dates */
+.list-due, .popup-due { font-size: 11px; margin-top: 2px; color: var(--muted); }
+.popup-due { font-size: 12px; margin: 4px 0; }
+.list-due.due-overdue, .popup-due.due-overdue,
+.list-due.due-today, .popup-due.due-today { color: #b91c1c; font-weight: 700; }
+.list-due.due-overdue::before, .popup-due.due-overdue::before,
+.list-due.due-today::before, .popup-due.due-today::before { content: "\25CF"; margin-right: 4px; }
+.popup-date-row { margin-top: 8px; }
+#followUpDateField .hint { font-weight: 400; margin-top: 2px; }
+input[type="date"] {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-size: 14px; font-family: inherit; background: #fff; color: var(--text);
+}
 .empty-msg { color: var(--muted); font-size: 13px; padding: 12px 6px; line-height: 1.5; }
 
 /* Map pins */

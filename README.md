@@ -23,19 +23,27 @@ computer being on:
   the map. Change status straight from the map pin's popup.
 - **Statuses**, each with its own pin color:
 
-  | Status | Pin |
-  |---|---|
-  | Not a Customer | Gray |
-  | Prospected | Red |
-  | Follow-Up Needed | Orange |
-  | Decision Maker Unavailable | Yellow |
-  | Grease Trap Service Contract | Blue |
-  | Used Cooking Oil (UCO) Contract | Green |
-  | Grease Trap and UCO Contracts | Purple |
+  | Status | Pin | Follow-up date |
+  |---|---|---|
+  | Not a Customer | Gray | |
+  | Prospected | Red | |
+  | Follow-Up Needed | Orange | yes |
+  | Decision Maker Unavailable | Yellow | yes |
+  | Grease Trap Service Contract | Blue | |
+  | Used Cooking Oil (UCO) Contract | Green | |
+  | Grease Trap and UCO Contracts | Purple | |
 
   To rename, recolor, or add a status, edit `js/statuses.js`. Everything else in the app
   follows from that list. Customers saved under a previous version's status are mapped to
   the closest current one automatically, so renaming never loses data.
+
+- **Follow-up dates** – setting a customer to *Follow-Up Needed* or *Decision Maker
+  Unavailable* reveals a date field, so the rep can record when to check back. Set it from
+  the Add/Edit form, straight from the map pin's popup, or while adding a search result.
+  The date shows on the customer's row and pin, and turns red and bold once it is due
+  today or overdue. It is included in the CSV export. Changing a customer to any other
+  status clears the date, so a signed customer never carries a stale reminder. Add
+  `needsDate: true` to any status in `js/statuses.js` to give it a date field too.
 - **Share link** – one button gives you the link to send to the team.
 - **Export / Import** – download the list as JSON (backup) or CSV (spreadsheet).
 - **Works on phones** – the layout adapts to small screens for salespeople in the field.
